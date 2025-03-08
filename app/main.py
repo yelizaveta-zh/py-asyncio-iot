@@ -24,6 +24,7 @@ async def main() -> None:
     hue_light = HueLightDevice()
     speaker = SmartSpeakerDevice()
     toilet = SmartToiletDevice()
+
     hue_light_id, speaker_id, toilet_id = await asyncio.gather(
         service.register_device(hue_light),
         service.register_device(speaker),
@@ -32,10 +33,10 @@ async def main() -> None:
 
     # Run wake-up program with proper order
     await run_sequence(
-        service.send_message(Message(hue_light_id, MessageType.SWITCH_ON)),
+        service.send_msg(Message(hue_light_id, MessageType.SWITCH_ON)),
         run_parallel(
-            service.send_message(Message(speaker_id, MessageType.SWITCH_ON)),
-            service.send_message(
+            service.send_msg(Message(speaker_id, MessageType.SWITCH_ON)),
+            service.send_msg(
                 Message(
                     speaker_id,
                     MessageType.PLAY_SONG,
@@ -48,13 +49,17 @@ async def main() -> None:
     # Run sleep program with proper order
     await run_sequence(
         run_parallel(
-            service.send_message(
+            service.send_msg(
                 Message(hue_light_id, MessageType.SWITCH_OFF)
             ),
-            service.send_message(Message(speaker_id, MessageType.SWITCH_OFF)),
+            service.send_msg(
+                Message(speaker_id, MessageType.SWITCH_OFF)
+            ),
         ),
-        service.send_message(Message(toilet_id, MessageType.FLUSH)),
-        service.send_message(Message(toilet_id, MessageType.CLEAN)),
+        run_sequence(
+            service.send_msg(Message(toilet_id, MessageType.FLUSH)),
+            service.send_msg(Message(toilet_id, MessageType.CLEAN)),
+        ),
     )
 
 

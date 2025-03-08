@@ -1,7 +1,7 @@
 import random
 import string
 import asyncio
-from typing import Protocol
+from typing import Protocol, Awaitable, Any
 
 from app.iot.message import Message, MessageType
 
@@ -42,10 +42,33 @@ class IOTService:
     def get_device(self, device_id: str) -> Device:
         return self.devices[device_id]
 
+    async def run_sequence(self, *functions: Awaitable[Any]) -> None:
+        for function in functions:
+            await function
+
+    async def run_parallel(self, *functions: Awaitable[Any]) -> None:
+        await asyncio.gather(*functions)
+
     async def run_program(self, program: list[Message]) -> None:
         print("=====RUNNING PROGRAM======")
-        for msg in program:
-            await self.send_msg(msg)
+        flush_clean = [
+            msg for msg in program
+            if msg.msg_type in {MessageType.FLUSH, MessageType.CLEAN}
+        ]
+        other_commands = [
+            msg for msg in program
+            if msg.msg_type not in {MessageType.FLUSH, MessageType.CLEAN}
+        ]
+
+        if flush_clean:
+            await asyncio.gather(
+                *(self.send_msg(msg) for msg in other_commands),
+                self.run_sequence(*(self.send_msg(msg) for msg in flush_clean))
+            )
+        else:
+            await asyncio.gather(
+                *(self.send_msg(msg) for msg in other_commands)
+            )
         print("=====END OF PROGRAM======")
 
     async def send_msg(self, msg: Message) -> None:
